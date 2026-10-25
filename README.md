@@ -1,60 +1,86 @@
-# E-Commerce PySpark ETL Project
+# 🛒 Ecommerce Sales Analytics — PySpark ETL Project
 
-A complete end-to-end ETL pipeline built in **PySpark** and **Spark SQL** on Databricks, processing e-commerce data from raw CSV files through to analytical insights.
+> End-to-end **ETL + analytics pipeline** on Databricks: raw e-commerce CSVs → validated & joined
+> DataFrames → four phases of business analysis (sales, products, customers, cohorts).
 
-## Project Overview
+---
 
-This project demonstrates a full ETL workflow on an e-commerce dataset covering **4 tables**: customers, orders, order items, and products.
+## 📦 Dataset
 
-### Data Source
-- **Location**: Unity Catalog Volume (`/Volumes/workspace/default/tutorial_learning/raw/`)
-- **Format**: CSV (4 files: `customers.csv`, `orders.csv`, `order_items.csv`, `products.csv`)
-- **Dataset Stats**:
-  - Customers: 2,015 rows / 2,000 distinct IDs (15 duplicates found)
-  - Orders: 10,000 rows (Jan 2022 – Jan 2026)
-  - Order Items: 21,968 rows
-  - Products: 100 rows
-  - All customers based in India
+Raw CSVs loaded from the Unity Catalog volume `workspace.default.tutorial_learning`:
 
-### Pipeline Structure
+| File | Grain | Rows | Key Columns |
+|---|---|---:|---|
+| `customers.csv` | one row per customer record | 2,015 *(2,000 distinct)* | `customer_id`, `customer_name`, `city`, `state`, `country`, `signup_date` |
+| `orders.csv` | one row per order | 10,000 | `order_id`, `customer_id`, `order_date`, `payment_method`, `order_status` |
+| `order_items.csv` | one row per product per order | 21,968 | `order_id`, `product_id`, `quantity`, `unit_price` |
+| `products.csv` | one row per product | 100 | `product_id`, `product_name`, `category`, `price` |
 
-| Stage | Description |
-| --- | --- |
-| **Data Reading** | Load 4 CSVs from UC Volume with schema inference |
-| **Order Value Rollup** | Compute order-level metrics (total price, item counts) |
-| **Schema Validation** | Validate data types across all tables |
-| **Duplicate Audit** | Identify and audit duplicate records |
-| **Table Joins** | Join all 4 tables using SQL temp views |
-| **Phase 1: Sales Analysis** | Revenue trends, yearly growth ($4.3M → $39.0M), payment methods |
-| **Phase 2: Product Analysis** | Category performance (Electronics ≈ 67% of revenue) |
-| **Phase 3: Customer Analysis** | Conversion rate (99.4%), state-wise distribution (Gujarat top) |
-| **Phase 4: Advanced/Cohort** | Cancelled/returned revenue (~$12.4M), cohort analysis |
+**Coverage** — signups Jan 2022 → Jun 2024 · orders Jan 2022 → Jan 2026 · all customers in India · 7 product categories · 5 payment methods.
 
-### Key Insights
-- Valid revenue grew from **$4.3M (2022)** to **$39.0M (2025)**
-- **Electronics** dominates with ~67% of total revenue
-- **UPI** is the top payment method
-- ~**$12.4M** in cancelled + returned revenue
-- **99.4%** customer conversion rate
-- **Gujarat** is the top state by customer count
+## 🔁 Pipeline
 
-## Tech Stack
+```
+UC Volume (CSV) ─▶ Spark DataFrames ─▶ schema validation (printSchema)
+                                   └▶ duplicate audit  →  ⚠ 15 duplicate rows in customers
+      ├─▶ order-level value rollup:  Σ (quantity × unit_price)  per order_id
+      └─▶ star join via SQL temp views:  customers ⋈ orders ⋈ order_items ⋈ products
+                     │
+                     ▼
+     Phase 1: Sales  ·  Phase 2: Products  ·  Phase 3: Customers  ·  Phase 4: Advanced
+```
 
-- **Compute**: Databricks Serverless
-- **Language**: PySpark + Spark SQL
-- **Data Source**: Unity Catalog Volumes (CSV)
-- **Platform**: Databricks
+**Data-quality rules applied**
+* Revenue metrics count only `Shipped`, `Processing`, `Completed` orders — `Cancelled` / `Returned` are excluded.
+* Yearly totals are capped at `year ≤ 2025` (a handful of orders fall in Jan 2026).
 
-## Notebook
+## 📊 Analysis Phases
 
-The main notebook `Ecommerce_PySpark_ETL_Project.py` contains the complete ETL pipeline with 62 cells covering all stages from data ingestion to advanced analytics.
+| Phase | Sections | Questions answered |
+|---|---|---|
+| **1 — Orders & Sales** | Monthly revenue · Yearly revenue + AOV · Order status · Payment methods | How do orders and revenue trend over time? |
+| **2 — Products** | Top 10 products · Category performance with `rank()` window | Which products and categories drive revenue? |
+| **3 — Customers** | Top spenders · Sales by state & city | Who and where are the best customers? |
+| **4 — Advanced** | Cancelled orders & lost sales · Signup cohorts + conversion rate | How much revenue leaks to cancellations? Do cohorts convert? |
 
-## How to Run
+## 💡 Key Insights
 
-1. Import the notebook into a Databricks workspace
-2. Ensure the source CSV files are available in a Unity Catalog volume
-3. Run on Serverless compute (or any compatible cluster)
-4. Execute cells sequentially from top to bottom
+**Yearly performance** (valid orders, year ≤ 2025):
+
+| Year | Orders | Revenue | AOV |
+|---|---:|---:|---:|
+| 2022 | 440 | $4.3M | $9.7K |
+| 2023 | 1,564 | $15.9M | $10.2K |
+| 2024 | 3,162 | $32.5M | $10.3K |
+| 2025 | 3,363 | $39.0M | $11.6K |
+
+* 📈 **~9× revenue growth** from 2022 to 2025, with AOV rising from ~$9.7K to ~$11.6K.
+* 🖥️ **Electronics dominates** — $63.6M ≈ **67%** of product revenue; next category (Clothing) is ~$9.8M.
+* 📱 **UPI is the #1 payment method** — 3,823 orders (~44% of valid orders) and $40.7M revenue.
+* 🛑 **~$12.4M potential lost sales** — 690 cancelled orders ($7.5M) + 507 returned orders ($4.9M).
+* 🧑‍🤝‍🧑 **99.4% conversion** — 1,987 of 2,000 customers placed at least one order.
+* 🗺️ **Gujarat is the top state** ($11.1M), followed by Uttar Pradesh, Maharashtra, Punjab, and West Bengal.
+
+## 🧰 Tech Stack
+
+* **Databricks Serverless** compute
+* **PySpark** DataFrame API — `filter`, `groupBy().agg()`, `countDistinct`, `when`, `withColumn`
+* **Spark SQL** — temp views + `--name` result DataFrames for joins and cohort analysis
+* **Window functions** — `rank() over Window.partitionBy() ... orderBy()`
+* **Unity Catalog Volumes** for raw-file storage
+
+## 🚀 How to Run
+
+1. Attach a **Serverless** compute to this notebook.
+2. Run all cells top-to-bottom — every step rebuilds from the raw CSVs.
+3. Requires read access to `/Volumes/workspace/default/tutorial_learning/raw/`.
+
+## ⚠ Data Quality Notes
+
+* 15 duplicate rows in `customers` (2,015 rows vs 2,000 distinct IDs) — flagged during the duplicate audit, not dropped.
+* ~$0.4M of revenue maps to a `NULL` category — order items referencing products missing from `products.csv`.
+* 52 orders have a `NULL` payment method (~$0.5M revenue).
+
 
 ## Author
 
