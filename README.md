@@ -2,6 +2,8 @@
 
 An end-to-end data project: raw e-commerce CSVs are cleaned and modelled with **PySpark** and **Spark SQL**, stored as **Bronze / Silver / Gold Delta tables** in Unity Catalog, analysed in four phases, and surfaced in a **Databricks dashboard** with business observations and recommendations.
 
+> **Dataset note:** The data is synthetic (generated for learning), so some patterns, such as a 99.4% customer conversion rate, are unrealistically clean. The focus of this project is the engineering and analysis approach, not real-world business conclusions. All amounts are in **Indian Rupees (INR)**. 1 L (lakh) = ₹1,00,000 and 1 Cr (crore) = ₹1,00,00,000.
+
 ---
 
 ## Dashboard Preview
@@ -134,6 +136,16 @@ Hypotheses to validate, given the synthetic data. Each ties to an observation ab
 | 6 | **Keep UPI frictionless.** Ensure UPI reliability, and consider UPI-specific offers. | About 44% of orders use UPI | Monitor UPI failure and cancellation rates. |
 ---
 
+## Data Quality Notes
+
+| Issue | Impact | Status |
+|---|---|---|
+| 15 duplicate customer rows (2,015 rows, 2,000 unique IDs) | Would inflate customer counts | Flagged in Bronze, removed in Silver |
+| Order items referencing products missing from `products.csv` | About ₹4 L of revenue has a NULL category | Documented, not yet resolved |
+| 52 orders with NULL payment method | About ₹5 L of revenue | Documented, not yet resolved |
+| Jan 2026 is a partial period | Distorts the last year in charts | Excluded from yearly tables; included in dashboard KPIs |
+
+---
 ## Tech Stack
 
 - **Databricks (Serverless)** for notebooks and the dashboard
